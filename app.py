@@ -167,6 +167,31 @@ def edit_jadwal(id_jadwal):
     flash('Jadwal berhasil diperbarui!', 'success')
     return redirect(url_for('halaman_jadwal'))
 
+# Rute detail kelas
+@app.route('/detail/<int:id_jadwal>')
+def detail_kelas(id_jadwal):
+    if not session.get('sudah_login'):
+        return redirect(url_for('login'))
+    
+    conn = get_db_connection()
+    
+    # ambil info matkul ini
+    matkul_info = conn.execute('SELECT * FROM jadwal WHERE id = ?', (id_jadwal,)).fetchone()
+    
+    # ambil data jurnal untuk matkul ini (diurutkan dari pertemuan terkecil)
+    data_jurnal = conn.execute('SELECT * FROM jurnal WHERE jadwal_id = ? ORDER BY pertemuan_ke ASC', (id_jadwal,)).fetchall()
+    
+    # ambil data resources untuk matkul ini
+    data_resources = conn.execute('SELECT * FROM resources WHERE jadwal_id = ?', (id_jadwal,)).fetchall()
+    
+    # trik cerdas: ambil tugas dari tabel 'tugas' yang nama matkulnya SAMA dengan nama matkul ini
+    data_tugas = conn.execute('SELECT * FROM tugas WHERE matkul = ?', (matkul_info['matkul'],)).fetchall()
+    
+    conn.close()
+    
+    # kirim semuanya ke halaman detail_kelas.html
+    return render_template('detail_kelas.html', matkul=matkul_info, jurnal=data_jurnal, resources=data_resources, tugas=data_tugas)
+
 # Route untuk halaman Absen
 @app.route('/absen', methods=['GET', 'POST'])
 def halaman_absen():
