@@ -192,6 +192,45 @@ def detail_kelas(id_jadwal):
     # kirim semuanya ke halaman detail_kelas.html
     return render_template('detail_kelas.html', matkul=matkul_info, jurnal=data_jurnal, resources=data_resources, tugas=data_tugas)
 
+# Rute Tambah Jurnal
+@app.route('/tambah_jurnal/<int:id_jadwal>', methods=['POST'])
+def tambah_jurnal(id_jadwal):
+    if not session.get('sudah_login'): return redirect(url_for('login'))
+    
+    pertemuan_ke = request.form['pertemuan_ke']
+    tanggal = request.form['tanggal']
+    materi = request.form['materi']
+    
+    conn = get_db_connection()
+    conn.execute('''
+        INSERT INTO jurnal (jadwal_id, pertemuan_ke, tanggal, materi) VALUES (?, ?, ?, ?)
+    ''', (id_jadwal, pertemuan_ke, tanggal, materi))
+    
+    conn.commit()
+    conn.close()
+    
+    flash('Mantap! Jurnal pertemuan berhasil dicatat.', 'success')
+    return redirect(url_for('detail_kelas', id_jadwal=id_jadwal))
+
+# Rute tambah link
+@app.route('/tambah_link/<int:id_jadwal>', methods=['POST'])
+def tambah_link(id_jadwal):
+    if not session.get('sudah_login'): return redirect(url_for('login'))
+    
+    nama_link = request.form['nama_link']
+    url = request.form['url']
+    
+    conn = get_db_connection()
+    conn.execute('''
+        INSERT INTO resources (jadwal_id, nama_link, url) VALUES (?, ?, ?)
+    ''', (id_jadwal, nama_link, url))
+    
+    conn.commit()
+    conn.close()
+    
+    flash('Referensi Link berhasil disimpan.', 'success')
+    return redirect(url_for('detail_kelas', id_jadwal=id_jadwal))
+
 # Route untuk halaman Absen
 @app.route('/absen', methods=['GET', 'POST'])
 def halaman_absen():
