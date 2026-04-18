@@ -1,10 +1,38 @@
 import sqlite3
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+import requests
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
 from datetime import datetime
 
 # Ini untuk menginisialisasi aplikasi Flask
 app = Flask(__name__)
 app.secret_key = 'kunci_rahasia_portal_ihsan'
+
+# Rute API Youtube
+@app.route('/api/youtube_stats')
+def youtube_stats():
+    # Satpam login
+    if not session.get('sudah_login'): 
+        return jsonify({'error': 'Belum login'}), 401
+    
+    API_KEY = 'AIzaSyCyAyCZrAQoTUc0Z6Z2dMwI547oWtHVav8'
+    CHANNEL_ID = 'UCefmzhGcyDHOE-wzoKy4egA'
+    url = f'https://www.googleapis.com/youtube/v3/channels?part=statistics&id={CHANNEL_ID}&key={API_KEY}'
+    
+    try:
+        respons = requests.get(url)
+        if respons.status_code == 200:
+            data = respons.json()
+            statistik = data['items'][0]['statistics']
+            # Kembalikan datanya dalam format JSON ke HTML
+            return jsonify({
+                'subscriber' : statistik['subscriberCount'],
+                'views' : statistik['viewCount'],
+                'video' : statistik['videoCount']
+            })
+        else:
+            return jsonify({'error' : 'Gagal mengambil data dari Google'}), 500
+    except Exception as e:
+        return jsonify({'error' : str(e)}), 500
 
 # Mesin login
 @app.route('/login', methods=['GET', 'POST'])
@@ -386,7 +414,102 @@ def hapus_absen(id_absen):
     
     # Refresh halaman absen
     return redirect(url_for('halaman_absen'))
+
+
+# Manajemen Konten ---------------------
+
+@app.route('/konten')
+def halaman_konten():
+    if not session.get('sudah_login'): return redirect(url_for('login'))
+    
+    conn = get_db_connection()
+    
+    # Ambil semua data konten, urutkan dari yang terbaru ditambahkan
+    semua_konten = conn.execute('SELECT * FROM konten ORDER BY id DESC').fetchall()
+    conn.close()
+    
+    return render_template('konten.html', daftar_konten=semua_konten)
+
+# Rute simpan konten baru
+@app.route('/tambah_konten', methods=['POST'])
+def tambah_konten():
+    if not session.get('sudah_login'): return redirect(url_for('login'))
+    
+    judul = request.form['judul']
+    status = "Ide" # Default status awal
+    
+    conn = get_db_connection()
+    conn.execute('INSERT INTO konten (judul, status) VALUES (?, ?)', (judul, status))
+    conn.commit()
+    conn.close()
+    
+    return redirect(url_for('halaman_konten'))
         
+# Rute ubah status konten (Pindah Kolom)
+@app.route('/update_status_konten/<int:id_konten>', methods=['POST'])
+def update_status_konten(id_konten):
+    if not session.get('sudah_login'): return redirect(url_for('login'))
+
+    status_baru = request.form['status']
+    
+    conn = get_db_connection()
+    conn.execute('UPDATE konten SET status = ? WHERE id = ?', (status_baru, id_konten))
+    conn.commit()
+    conn.close()
+    
+    return redirect(url_for('halaman_konten'))
+
+# Rute toogle platform
+@app.route('/toggle_platform/<int:id_konten>/<platform>')
+def toggle_platform(id_konten, platform):
+    if not session.get('sudah_login'): return redirect(url_for('login'))
+    
+    # Tentukan nama kolom di database berdasarkan tombol yang diklik
+    kolom = ""
+    if platform == 'yt': kolom = 'platform_yt'
+    elif platform == 'tt': kolom = 'platform_tt'
+    elif platform == 'ig': kolom = 'platform_ig'
+    
+    if kolom:
+        conn = get_db_connection()
+        # Logika toogle (jika 1 jadi 0, jika 0 jadi 1)
+        data_lama = conn.execute(f'SELECT {kolom} FROM konten WHERE id = ?', (id_konten,)).fetchone()[0]
+        nilai_baru = 0 if data_lama == 1 else 1
+        
+        conn.execute(f'UPDATE konten SET {kolom} = ? WHERE id = ?', (nilai_baru, id_konten))
+        conn.commit()
+        conn.close()
+    
+    return redirect(url_for('halaman_konten'))
+
+# Rute hapus konten
+@app.route('/hapus_konten/<int:id_konten>')
+def hapus_konten(id_konten):
+    if not session.get('sudah_login'): return redirect(url_for('login'))
+    
+    conn = get_db_connection()
+    conn.execute('DELETE FROM konten WHERE id = ?', (id_konten,))
+    conn.commit()
+    conn.close()
+    
+    return redirect(url_for('halaman_konten'))
+
+# Rute edit konten
+@app.route('/edit_konten/<int:id_konten>', methods=['POST'])
+def edit_konten(id_konten):
+    if not session.get('sudah_login'): return redirect(url_for('login'))
+    
+    judul_baru = request.form['judul']
+    link_riset = request.form['link_riset']
+    prompt_ai = request.form['prompt_ai']
+    
+    conn = get_db_connection()
+    conn.execute('UPDATE konten SET judul = ?, link_riset = ?, promp_ai = ? WHERE id = ? ', (judul_baru, link_riset, prompt_ai, id_konten))
+    
+    conn.commit()
+    conn.close()
+    
+    return redirect(url_for('halaman_konten'))
 
 # Perintah untuk menjalankan server lokal
 if __name__ == "__main__":
