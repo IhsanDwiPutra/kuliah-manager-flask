@@ -1,11 +1,12 @@
 import sqlite3
 import requests
 from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # Ini untuk menginisialisasi aplikasi Flask
 app = Flask(__name__)
 app.secret_key = 'kunci_rahasia_portal_ihsan'
+app.permanent_session_lifetime = timedelta(days=30)
 
 # Rute API Youtube
 @app.route('/api/youtube_stats')
@@ -42,6 +43,9 @@ def login():
         password_input = request.form['password']
         
         if username_input == 'ihsan' and password_input == '#admin123':
+            
+            session.permanent = True;
+            
             session['sudah_login'] = True # Berikan stempel VIP
             return redirect(url_for('halaman_jadwal'))
         else:
